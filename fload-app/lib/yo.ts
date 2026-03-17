@@ -23,8 +23,8 @@ export const yoClient = createYoClient({ chainId: 8453 })
 
 export async function getVaultAPY(vault: keyof typeof VAULT_ADDRESSES): Promise<number | null> {
   try {
-    const snapshot: VaultSnapshot = await yoClient.getVaultSnapshot(VAULT_ADDRESSES[vault])
-    return snapshot.apy
+    const snapshot = await yoClient.getVaultSnapshot(VAULT_ADDRESSES[vault])
+    return (snapshot as any).stats?.apy ?? (snapshot as any).stats?.currentApy ?? null
   } catch {
     return null
   }
