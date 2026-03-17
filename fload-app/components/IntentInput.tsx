@@ -2,11 +2,12 @@
 
 import { useState } from 'react'
 import { useAccount } from 'wagmi'
-import { useDeposit, useApprove } from '@yo-protocol/react'
+import { useDeposit, useApprove, useVaultState } from '@yo-protocol/react'
 import { parseUnits } from 'viem'
 import { addDays } from 'date-fns'
 import { saveFloat } from '@/lib/schedule'
 import { VAULT_DECIMALS, VAULT_ADDRESSES, UNDERLYING_ADDRESSES } from '@/lib/yo'
+import { GasWarning, useGasGate } from '@/components/GasGate'
 import type { FloatPlan } from '@/lib/classify'
 
 type VaultKey = 'yoUSD' | 'yoETH' | 'yoBTC'
@@ -88,11 +89,13 @@ export function IntentInput({ onFloatCreated }: Props) {
           ) : 'FLOAT IT →'}
         </button>
       </div>
+      {/* Quick examples */}
       <div className="flex flex-wrap gap-2">
         {[
           '$800 rent in 25 days',
-          '$2000 for a laptop in 2 months',
-          '$500 trip fund, maybe 3 months out',
+          '$500 in yoETH vault for 90 days',
+          '$200 in yoBTC for 3 months',
+          '$2000 laptop in 60 days',
         ].map(example => (
           <button
             key={example}
@@ -102,6 +105,16 @@ export function IntentInput({ onFloatCreated }: Props) {
             {example}
           </button>
         ))}
+      </div>
+
+      {/* Vault hint */}
+      <div className="flex items-start gap-2 px-1">
+        <p className="font-body text-xs text-black/40 leading-relaxed">
+          💡 To pick a vault directly, just say:{' '}
+          <span className="font-display text-xs text-black/60">"$500 in yoETH for 60 days"</span>
+          {' or '}
+          <span className="font-display text-xs text-black/60">"$200 in yoBTC vault for 90 days"</span>
+        </p>
       </div>
     </div>
   )
@@ -163,11 +176,6 @@ export function IntentInput({ onFloatCreated }: Props) {
   )
 }
 
-/*
- * Each split gets its OWN component so useDeposit and useApprove
- * hooks bind to the correct vault/token at mount time.
- * This is the React-correct way to handle per-item hooks.
- */
 function SplitDepositCard({
   split,
   address,
@@ -184,6 +192,12 @@ function SplitDepositCard({
   const vaultAddress = VAULT_ADDRESSES[vaultKey] as `0x${string}`
   const underlyingToken = UNDERLYING_ADDRESSES[vaultKey] as `0x${string}`
   const decimals = VAULT_DECIMALS[vaultKey]
+  const depositAmount = split.plan.amount * (1 - split.plan.liquidBuffer / 100)
+
+  // Gas gate check
+  const gasGate = useGasGate(depositAmount, split.plan.daysUntilNeeded, split.apy)
+
+  const { vaultState } = useVaultState(vaultKey)
 
   const { deposit, isLoading: depositing } = useDeposit({
     vault: vaultAddress,
@@ -197,7 +211,6 @@ function SplitDepositCard({
   async function handleDeposit() {
     if (!address || !vaultAddress || !underlyingToken) return
 
-    const depositAmount = split.plan.amount * (1 - split.plan.liquidBuffer / 100)
     const amount = parseUnits(depositAmount.toString(), decimals)
 
     try {
@@ -205,10 +218,18 @@ function SplitDepositCard({
       await approve(amount)
 
       setStatus('depositing')
-   const hash = await deposit({
+      const hash = await deposit({
         token: underlyingToken,
         amount,
       })
+
+      // Capture exchange rate at deposit time for delta tracking
+      const ASSET_DECIMALS: Record<string, number> = { yoUSD: 6, yoETH: 18, yoBTC: 8 }
+      const rawRate = vaultState?.exchangeRate
+      const dec = ASSET_DECIMALS[vaultKey] ?? 6
+      const depositExchangeRate = rawRate
+        ? (Number(rawRate) < 100 ? Number(rawRate) : Number(rawRate) / 10 ** dec)
+        : null
 
       saveFloat({
         id: crypto.randomUUID(),
@@ -221,7 +242,8 @@ function SplitDepositCard({
         neededAt: addDays(new Date(), split.plan.daysUntilNeeded).toISOString(),
         status: 'active',
         txHash: hash,
-      })
+        ...(depositExchangeRate ? { depositExchangeRate } : {}),
+      } as any)
 
       setStatus('done')
       onComplete()
@@ -262,9 +284,7 @@ function SplitDepositCard({
         </div>
         <div className="p-3 rounded-md bg-acid/30 border-2 border-acid-dark">
           <p className="font-display text-[10px] uppercase text-acid-dark">FLOAT</p>
-          <p className="font-display font-bold text-black">
-            {split.worthIt.friendlyYield}
-          </p>
+          <p className="font-display font-bold text-black">{split.worthIt.friendlyYield}</p>
         </div>
       </div>
 
@@ -285,12 +305,20 @@ function SplitDepositCard({
       <div className="flex justify-between text-sm font-body">
         <span className="text-black/50">Certainty</span>
         <span className={`neu-tag ${split.plan.certainty === 'high' ? 'bg-acid' :
-            split.plan.certainty === 'medium' ? 'bg-blue text-white' :
-              'bg-orange text-white'
-          }`}>
+          split.plan.certainty === 'medium' ? 'bg-blue text-black' : 'bg-orange text-black'
+        }`}>
           {split.plan.certainty}
         </span>
       </div>
+
+      {/* Gas gate warning — informational only, never blocks */}
+      {gasGate.status !== 'ok' && (
+        <GasWarning
+          amount={depositAmount}
+          days={split.plan.daysUntilNeeded}
+          apy={split.apy}
+        />
+      )}
 
       {status === 'done' ? (
         <div className="neu-btn bg-acid/30 text-center pointer-events-none">✓ FLOATED</div>
@@ -305,7 +333,7 @@ function SplitDepositCard({
               <span className="inline-block w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
               {status === 'approving' ? 'APPROVING...' : 'DEPOSITING...'}
             </span>
-          ) : `CONFIRM FLOAT — $${(split.plan.amount * (1 - split.plan.liquidBuffer / 100)).toFixed(0)}`}
+          ) : `CONFIRM FLOAT — $${depositAmount.toFixed(0)}`}
         </button>
       )}
 

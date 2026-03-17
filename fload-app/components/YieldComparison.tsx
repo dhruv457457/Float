@@ -22,7 +22,7 @@ export function YieldComparison({ floatApy }: Props) {
   return (
     <div className="neu-card p-5 flex flex-col gap-4">
       <div className="flex items-center gap-2">
-        <div className="neu-tag bg-blue text-white">VS</div>
+        <div className="neu-tag bg-blue text-black">VS</div>
         <p className="font-display font-bold text-sm">YIELD COMPARISON</p>
       </div>
 

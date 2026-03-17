@@ -2,9 +2,10 @@
 
 import { WagmiProvider } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit'
+import { RainbowKitProvider } from '@rainbow-me/rainbowkit'
 import { YieldProvider } from '@yo-protocol/react'
-import { config } from '@/wagmi.config'
+import { APYProvider } from '@/lib/apy-context'
+import { config } from '@/lib/wagmi'
 import '@rainbow-me/rainbowkit/styles.css'
 
 const queryClient = new QueryClient()
@@ -13,9 +14,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider theme={darkTheme()}>
+        <RainbowKitProvider>
           <YieldProvider defaultSlippageBps={50}>
-            {children}
+            <APYProvider>
+              {children}
+            </APYProvider>
           </YieldProvider>
         </RainbowKitProvider>
       </QueryClientProvider>

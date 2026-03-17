@@ -33,7 +33,7 @@ export function RiskPanel() {
         className="flex items-center justify-between w-full"
       >
         <div className="flex items-center gap-2">
-          <div className="neu-tag bg-pink text-white">RISK</div>
+          <div className="neu-tag bg-pink text-black">RISK</div>
           <p className="font-display font-bold text-sm">TRANSPARENCY</p>
         </div>
         <span className="font-display text-lg">{expanded ? '−' : '+'}</span>
@@ -47,9 +47,9 @@ export function RiskPanel() {
           </p>
 
           {/* Vault breakdown */}
-      {(Object.entries(VAULT_INFO) as [VaultId, typeof VAULT_INFO[string]][]).map(([id, info]) => (
-  <VaultRiskRow key={id} vaultId={id} info={info} />
-))}
+          {(Object.entries(VAULT_INFO) as [VaultId, typeof VAULT_INFO[string]][]).map(([id, info]) => (
+            <VaultRiskRow key={id} vaultId={id} info={info} />
+          ))}
 
           {/* Risk warnings */}
           <div className="p-4 bg-pink/10 border-2 border-pink rounded-md">

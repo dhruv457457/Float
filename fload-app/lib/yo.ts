@@ -1,5 +1,4 @@
 import { createYoClient, VAULTS } from '@yo-protocol/core'
-import type { VaultSnapshot } from '@yo-protocol/core'
 
 export const VAULT_ADDRESSES = {
   yoUSD: '0x0000000f2eb9f69274678c76222b35eec7588a65',
@@ -24,7 +23,7 @@ export const yoClient = createYoClient({ chainId: 8453 })
 export async function getVaultAPY(vault: keyof typeof VAULT_ADDRESSES): Promise<number | null> {
   try {
     const snapshot = await yoClient.getVaultSnapshot(VAULT_ADDRESSES[vault])
-    return (snapshot as any).stats?.apy ?? (snapshot as any).stats?.currentApy ?? null
+    return (snapshot as any).stats?.apy ?? (snapshot as any).stats?.currentApy ?? (snapshot as any).apy ?? null
   } catch {
     return null
   }

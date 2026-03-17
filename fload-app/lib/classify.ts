@@ -16,8 +16,13 @@ export interface SplitPlan {
 
 export async function classifyIntent(
   userMessage: string,
-  availableBalance: number
+  availableBalance: number,
+  vaultApys?: Record<string, number>
 ): Promise<SplitPlan> {
+  const apyContext = vaultApys
+    ? `\nCurrent live vault APYs: yoUSD=${vaultApys.yoUSD?.toFixed(2) ?? '~3'}%, yoETH=${vaultApys.yoETH?.toFixed(2) ?? '~3'}%, yoBTC=${vaultApys.yoBTC?.toFixed(2) ?? '~2'}%`
+    : ''
+
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -34,16 +39,18 @@ export async function classifyIntent(
           content: `You are FLOAT's smart savings advisor. Users describe money they plan to spend. You analyze and return an optimal vault plan.
 
 You can suggest SPLITTING funds across multiple vaults if it makes sense.
+${apyContext}
 
 Rules for each split:
 - Timeline < 7 days → vault: yoUSD, liquidBuffer: 30-40 (short timeline)
 - Timeline 7-60 days → vault: yoUSD (stable, predictable)
 - Timeline > 60 days, user mentions ETH/crypto → vault: yoETH
 - Timeline > 60 days, user mentions BTC/bitcoin → vault: yoBTC
-- If user has excess beyond their goal, suggest floating the remainder in yoETH or yoUSD
+- If user has excess beyond their goal, suggest floating the remainder in the highest-APY vault
 - certainty: high = fixed bill/rent, medium = planned purchase, low = "maybe"/"thinking about"
 - liquidBuffer: % to keep in wallet (0 = fully confident, 40 = very uncertain)
 - friendlyLabel: short 2-3 word label like "Rent fund", "Trip fund", "Laptop fund"
+- Use the live APY data to make smarter vault recommendations
 
 When to split:
 - User mentions multiple expenses → one split per expense
@@ -81,11 +88,7 @@ Respond ONLY in JSON. No markdown. No other text.
   try {
     const parsed = JSON.parse(text.replace(/```json|```/g, '').trim())
     if (!parsed.splits) {
-      return {
-        splits: [parsed],
-        overallReasoning: parsed.reasoning || '',
-        totalAmount: parsed.amount || 0,
-      }
+      return { splits: [parsed], overallReasoning: parsed.reasoning || '', totalAmount: parsed.amount || 0 }
     }
     return parsed
   } catch {
