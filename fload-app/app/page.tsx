@@ -67,8 +67,8 @@ export default function Home() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full max-w-2xl">
                         {[
                             { step: '01', title: 'TELL IT', desc: '"$800 for rent in 25 days"', color: 'bg-acid' },
-                            { step: '02', title: 'FLOAT IT', desc: 'AI picks the best YO vault', color: 'bg-blue text-white' },
-                            { step: '03', title: 'GET IT', desc: 'Money + yield, on time', color: 'bg-pink text-white' },
+                            { step: '02', title: 'FLOAT IT', desc: 'AI picks the best YO vault', color: 'bg-blue text-acid' },
+                            { step: '03', title: 'GET IT', desc: 'Money + yield, on time', color: 'bg-pink text-acid' },
                         ].map((item) => (
                             <div key={item.step} className="neu-card p-5 flex flex-col gap-2">
                                 <div className={`neu-tag ${item.color} w-fit`}>{item.step}</div>

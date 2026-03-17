@@ -6,19 +6,33 @@ import { useEffect, useState, useCallback } from 'react'
 import { IntentInput } from '@/components/IntentInput'
 import { FloatCard } from '@/components/FloatCard'
 import { VaultDashboard } from '@/components/VaultDashboard'
+import { VaultComparisonTable } from '@/components/VaultComparisonTable'
 import { YieldComparison } from '@/components/YieldComparison'
 import { RiskPanel } from '@/components/RiskPanel'
+import { RebalancerPanel } from '@/components/RebalancerPanel'
+import { GasGatePanel } from '@/components/GasGate'
+import { AICoach } from '@/components/AICoach'
+import { YieldForecast } from '@/components/YieldForecast'
+import { PortfolioIntel } from '@/components/PortfolioIntel'
 import { MilestoneToasts } from '@/components/MilestoneToasts'
 import { SavingsReceipt } from '@/components/SavingsReceipt'
-import { PortfolioSummary } from '@/components/PortfolioSummary'
 import { getFloats, checkMilestones, type FloatEntry } from '@/lib/schedule'
+import { differenceInDays } from 'date-fns'
 
-type Tab = 'float' | 'vaults' | 'risk'
+type Tab = 'float' | 'vaults' | 'intelligence' | 'risk'
+
+const TABS: { id: Tab; label: string; emoji: string }[] = [
+  { id: 'float', label: 'Float', emoji: '💸' },
+  { id: 'vaults', label: 'Vaults', emoji: '⚡' },
+  { id: 'intelligence', label: 'Intelligence', emoji: '🧠' },
+  { id: 'risk', label: 'Risk', emoji: '🛡' },
+]
 
 export default function Dashboard() {
   const { isConnected } = useAccount()
   const [floats, setFloats] = useState<FloatEntry[]>([])
   const [tab, setTab] = useState<Tab>('float')
+  const [intelTab, setIntelTab] = useState<'rebalancer' | 'gas' | 'coach' | 'forecast' | 'intel'>('intel')
   const avgApy = 3.2
 
   const refreshFloats = useCallback(() => {
@@ -33,9 +47,18 @@ export default function Dashboard() {
     return () => clearInterval(interval)
   }, [refreshFloats])
 
+  const totalDeposited = floats.reduce((s, f) => s + f.depositedAmount, 0)
+  const now = new Date()
+  const totalYield = floats.reduce((s, f) => {
+    const days = differenceInDays(now, new Date(f.depositedAt))
+    return s + (avgApy / 100 / 365) * days * f.depositedAmount
+  }, 0)
+  const nextFloat = floats
+    .sort((a, b) => new Date(a.neededAt).getTime() - new Date(b.neededAt).getTime())[0]
+  const nextDays = nextFloat ? differenceInDays(new Date(nextFloat.neededAt), now) : null
+
   if (!isConnected) return (
     <div className="min-h-screen bg-cream flex flex-col items-center justify-center gap-8 px-6">
-      {/* Disconnected state */}
       <div className="neu-card p-10 max-w-md w-full text-center flex flex-col items-center gap-6">
         <div className="w-20 h-20 bg-acid border-neu border-black rounded-lg flex items-center justify-center shadow-neu">
           <span className="font-display text-3xl font-bold">F.</span>
@@ -58,88 +81,206 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-cream">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-cream border-b-neu border-black">
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="font-display text-xl font-bold tracking-tight">
-            FLOAT<span className="text-acid-dark">.</span>
+      <header className="sticky top-0 z-40 bg-cream/95 backdrop-blur-sm border-b-2 border-black/10">
+        <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-6">
+            <span className="font-display text-xl font-bold tracking-tight">
+              FLOAT<span className="text-acid-dark">.</span>
+            </span>
+            <div className="hidden md:flex gap-1">
+              {TABS.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => setTab(t.id)}
+                  className={`px-4 py-1.5 rounded-full font-body text-sm transition-all ${tab === t.id
+                      ? 'bg-black text-white'
+                      : 'text-black/50 hover:text-black hover:bg-black/5'
+                    }`}
+                >
+                  {t.emoji} {t.label}
+                </button>
+              ))}
+            </div>
           </div>
           <ConnectButton accountStatus="avatar" showBalance={false} />
         </div>
       </header>
 
-      {/* Tab nav */}
-      <nav className="max-w-lg mx-auto px-4 pt-4">
-        <div className="flex gap-2">
-          {([
-            { id: 'float' as Tab, label: 'FLOAT' },
-            { id: 'vaults' as Tab, label: 'VAULTS' },
-            { id: 'risk' as Tab, label: 'RISK' },
-          ]).map(t => (
+      {/* Mobile tab nav */}
+      <nav className="md:hidden px-4 pt-3">
+        <div className="flex gap-1 bg-black/5 p-1 rounded-lg">
+          {TABS.map(t => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`neu-tag cursor-pointer transition-all ${
-                tab === t.id
-                  ? 'bg-black text-white shadow-none'
-                  : 'bg-white hover:bg-cream'
-              }`}
+              className={`flex-1 py-2 rounded-md font-body text-xs transition-all ${tab === t.id
+                  ? 'bg-white shadow-sm text-black font-medium'
+                  : 'text-black/40'
+                }`}
             >
-              {t.label}
+              {t.emoji} {t.label}
             </button>
           ))}
         </div>
       </nav>
 
-      {/* Content */}
-      <main className="max-w-lg mx-auto px-4 py-6 flex flex-col gap-6">
+      <main className="max-w-6xl mx-auto px-6 py-8">
 
+        {/* ─── FLOAT TAB ─── */}
         {tab === 'float' && (
-          <>
-            {/* Portfolio summary */}
-            <PortfolioSummary floats={floats} avgApy={avgApy} />
-
-            {/* Intent input */}
-            <IntentInput onFloatCreated={refreshFloats} />
-
-            {/* Active floats */}
+          <div className="flex flex-col gap-10 animate-float-in">
             {floats.length > 0 && (
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <p className="font-display text-xs font-bold uppercase tracking-wider text-black/40">
-                    Active floats ({floats.length})
-                  </p>
+              <div className="flex items-baseline gap-10 flex-wrap">
+                <div>
+                  <p className="font-body text-xs text-black/40 uppercase tracking-wider">Floating</p>
+                  <p className="font-display text-4xl font-bold">${totalDeposited.toFixed(0)}</p>
                 </div>
-                {floats.map(f => <FloatCard key={f.id} float={f} apy={avgApy} />)}
+                <div>
+                  <p className="font-body text-xs text-acid-dark uppercase tracking-wider">Earned</p>
+                  <p className="font-display text-4xl font-bold text-acid-dark">+${totalYield.toFixed(4)}</p>
+                </div>
+                <div>
+                  <p className="font-body text-xs text-black/40 uppercase tracking-wider">Next ready</p>
+                  <p className="font-display text-4xl font-bold">{nextDays !== null ? `${nextDays}d` : '—'}</p>
+                </div>
+                <div className="ml-auto hidden lg:block">
+                  <SavingsReceipt avgApy={avgApy} />
+                </div>
               </div>
             )}
 
-            {/* Yield comparison */}
-            <YieldComparison floatApy={avgApy} />
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+              {/* Left */}
+              <div className="lg:col-span-3 flex flex-col gap-6">
+                <IntentInput onFloatCreated={refreshFloats} />
+                {floats.length > 0 && (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <p className="font-body text-sm font-medium text-black/40">Active floats</p>
+                      <span className="font-display text-xs text-black/30">{floats.length}</span>
+                    </div>
+                    {floats.map(f => <FloatCard key={f.id} float={f} apy={avgApy} onRedeemed={refreshFloats} />)}
+                  </div>
+                )}
+              </div>
 
-            {/* Savings receipt */}
-            <SavingsReceipt avgApy={avgApy} />
-          </>
+              {/* Right */}
+              <div className="lg:col-span-2 flex flex-col gap-6">
+                <YieldComparison floatApy={avgApy} />
+
+                <div className="border-2 border-black/10 rounded-lg p-5 bg-white">
+                  <p className="font-body text-sm font-medium text-black/40 mb-3">Live vault rates</p>
+                  <div className="flex flex-col gap-2">
+                    {[
+                      { name: 'yoUSD', apy: '3.18' },
+                      { name: 'yoETH', apy: '5.42' },
+                      { name: 'yoBTC', apy: '1.92' },
+                    ].map(v => (
+                      <div key={v.name} className="flex items-center justify-between py-1">
+                        <span className="font-display text-xs font-bold">{v.name.toUpperCase()}</span>
+                        <span className="font-body text-sm text-black/60">{v.apy}% APY</span>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setTab('vaults')}
+                    className="w-full mt-3 py-2 text-center font-body text-xs text-black/40 hover:text-black border-t border-black/10 transition-colors"
+                  >
+                    View full vault dashboard →
+                  </button>
+                </div>
+
+                <div className="lg:hidden">
+                  <SavingsReceipt avgApy={avgApy} />
+                </div>
+              </div>
+            </div>
+          </div>
         )}
 
+        {/* ─── VAULTS TAB ─── */}
         {tab === 'vaults' && (
-          <VaultDashboard />
+          <div className="animate-float-in">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="font-display text-2xl font-bold">Vault dashboard</h2>
+              <span className="neu-tag bg-acid">Live on-chain data</span>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div>
+                <p className="font-display text-xs font-bold uppercase text-black/40 tracking-wider mb-3">
+                  Live comparison
+                </p>
+                <VaultComparisonTable />
+              </div>
+              <div>
+                <p className="font-display text-xs font-bold uppercase text-black/40 tracking-wider mb-3">
+                  APY history
+                </p>
+                <VaultDashboard />
+              </div>
+            </div>
+          </div>
         )}
 
+        {/* ─── INTELLIGENCE TAB ─── */}
+        {tab === 'intelligence' && (
+          <div className="animate-float-in">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-display text-2xl font-bold">Intelligence</h2>
+              <span className="neu-tag bg-acid">AI-powered</span>
+            </div>
+
+            {/* Sub-tabs */}
+            <div className="flex gap-1 bg-black/5 p-1 rounded-lg mb-6 overflow-x-auto">
+              {([
+                { id: 'intel', label: '🔬 Portfolio Report' },
+                { id: 'rebalancer', label: '🔄 Rebalancer' },
+                { id: 'coach', label: '🧠 AI Coach' },
+                { id: 'forecast', label: '📈 Yield Forecast' },
+                { id: 'gas', label: '⛽ Gas Gate' },
+              ] as const).map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => setIntelTab(t.id)}
+                  className={`flex-1 py-2 px-3 rounded-md font-body text-xs transition-all whitespace-nowrap ${intelTab === t.id
+                      ? 'bg-white shadow-sm text-black font-medium border border-black/10'
+                      : 'text-black/40 hover:text-black'
+                    }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="max-w-3xl">
+              {intelTab === 'intel' && <PortfolioIntel avgApy={avgApy} />}
+              {intelTab === 'rebalancer' && <RebalancerPanel />}
+              {intelTab === 'coach' && <AICoach />}
+              {intelTab === 'forecast' && <YieldForecast />}
+              {intelTab === 'gas' && <GasGatePanel />}
+            </div>
+          </div>
+        )}
+
+        {/* ─── RISK TAB ─── */}
         {tab === 'risk' && (
-          <RiskPanel />
+          <div className="max-w-3xl animate-float-in">
+            <h2 className="font-display text-2xl font-bold mb-6">Risk & transparency</h2>
+            <RiskPanel />
+          </div>
         )}
 
-        {/* Footer */}
-        <footer className="text-center py-6 border-t-2 border-dashed border-black/10">
-          <p className="font-display text-xs text-black/30">
+        <footer className="text-center py-8 mt-12 border-t border-black/5">
+          <p className="font-body text-xs text-black/25">
             FLOAT • Built on{' '}
-            <a href="https://yo.xyz" target="_blank" rel="noopener" className="underline">YO Protocol</a>
+            <a href="https://yo.xyz" target="_blank" rel="noopener" className="underline hover:text-black/50 transition-colors">
+              YO Protocol
+            </a>
             {' '}• Base Chain
           </p>
         </footer>
       </main>
 
-      {/* Milestone toasts */}
       <MilestoneToasts />
     </div>
   )
