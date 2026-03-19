@@ -139,7 +139,7 @@ FLOAT is built on the assumption that users trust it with real money.
 ## Setup
 
 ```bash
-git clone https://github.com/your-repo/float
+git clone https://github.com/dhruv457457/Float
 cd float/fload-app
 ```
 
@@ -155,15 +155,7 @@ npm install && npm run dev
 
 Connect MetaMask on Base mainnet → start floating.
 
----
 
-## Roadmap
-
-- **Gelato automation** — 24/7 auto-redeem without needing the app open
-- **Recurring floats** — *"Float my rent every month automatically"*
-- **Voice input** — describe goals by speaking
-- **Multi-chain** — Ethereum + Arbitrum via YO Gateway
-- **Mobile PWA** — push notifications when yield milestones hit
 
 ---
 
