@@ -14,6 +14,30 @@ interface Props {
 
 export function FloatCard({ float: f, apy = 3.2, onRedeemed }: Props) {
   const [redeemError, setRedeemError] = useState('')
+  const [autoRedeem, setAutoRedeem] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem(`auto_redeem_${f.id}`)
+      return stored === null ? true : stored === 'true' // default ON
+    } catch { return true }
+  })
+
+  function toggleAutoRedeem() {
+    const next = !autoRedeem
+    setAutoRedeem(next)
+    try {
+      localStorage.setItem(`auto_redeem_${f.id}`, String(next))
+      // Update the float entry
+      const raw = localStorage.getItem('float_entries')
+      if (raw) {
+        const entries = JSON.parse(raw)
+        const idx = entries.findIndex((e: any) => e.id === f.id)
+        if (idx !== -1) {
+          entries[idx].autoRedeemDisabled = !next
+          localStorage.setItem('float_entries', JSON.stringify(entries))
+        }
+      }
+    } catch {}
+  }
   const [liveYield, setLiveYield] = useState(0)
   const startRef = useRef(Date.now())
 
@@ -50,6 +74,7 @@ export function FloatCard({ float: f, apy = 3.2, onRedeemed }: Props) {
 
   const urgencyText = daysLeft > 0 ? `${daysLeft}d left` : `${hoursLeft}h left`
   const isRedeemable = daysLeft <= 1 && f.status === 'active'
+  const [showEmergency, setShowEmergency] = useState(false)
 
   async function handleRedeem() {
     try {
@@ -104,23 +129,34 @@ export function FloatCard({ float: f, apy = 3.2, onRedeemed }: Props) {
           Ready {format(new Date(f.neededAt), 'MMM d, yyyy')}
         </p>
         {f.txHash && (
-          <a
-            href={`https://basescan.org/tx/${f.txHash}`}
-            target="_blank"
-            rel="noopener"
-            className="font-body text-xs text-blue hover:underline"
-          >
+          <a href={`https://basescan.org/tx/${f.txHash}`}
+            target="_blank" rel="noopener"
+            className="font-body text-xs text-blue hover:underline">
             View TX ↗
           </a>
         )}
       </div>
 
+      {/* Auto-redeem toggle */}
+      <div className="flex items-center justify-between py-1 border-t border-black/5">
+        <div className="flex items-center gap-1.5">
+          <span className="font-display text-xs text-black/40 uppercase tracking-wider">
+            Auto-redeem
+          </span>
+          <span className="font-body text-[10px] text-black/25">
+            {autoRedeem ? 'on deadline' : 'disabled'}
+          </span>
+        </div>
+        <button onClick={toggleAutoRedeem}
+          className={`relative w-9 h-5 rounded-full transition-colors border-2 border-black/20 ${autoRedeem ? 'bg-acid' : 'bg-black/10'}`}>
+          <span className={`absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white border border-black/20 transition-all ${autoRedeem ? 'left-[18px]' : 'left-0.5'}`} />
+        </button>
+      </div>
+
+      {/* Ready to redeem */}
       {isRedeemable && (
-        <button
-          onClick={handleRedeem}
-          disabled={redeeming}
-          className="neu-btn neu-btn-primary w-full text-xs mt-1"
-        >
+        <button onClick={handleRedeem} disabled={redeeming}
+          className="neu-btn neu-btn-primary w-full text-xs mt-1">
           {redeeming ? (
             <span className="flex items-center justify-center gap-2">
               <span className="inline-block w-3 h-3 border-2 border-black/30 border-t-black rounded-full animate-spin" />
@@ -128,6 +164,39 @@ export function FloatCard({ float: f, apy = 3.2, onRedeemed }: Props) {
             </span>
           ) : 'REDEEM NOW →'}
         </button>
+      )}
+
+      {/* Emergency exit — always available */}
+      {!isRedeemable && (
+        <div className="flex flex-col gap-2">
+          {!showEmergency ? (
+            <button onClick={() => setShowEmergency(true)}
+              className="font-display text-xs text-black/25 hover:text-pink transition-colors text-center uppercase tracking-wider py-1">
+              ⚠ Emergency exit
+            </button>
+          ) : (
+            <div className="border border-pink/30 rounded-lg p-3 bg-pink/5 flex flex-col gap-2">
+              <p className="font-body text-xs text-pink/80">
+                Redeeming early exits your float before the deadline. You keep all yield earned so far but forfeit future yield.
+              </p>
+              <div className="flex gap-2">
+                <button onClick={handleRedeem} disabled={redeeming}
+                  className="flex-1 py-2 rounded-lg border-2 border-pink text-pink font-display text-xs hover:bg-pink hover:text-white transition-all">
+                  {redeeming ? (
+                    <span className="flex items-center justify-center gap-1">
+                      <span className="inline-block w-3 h-3 border-2 border-pink/30 border-t-pink rounded-full animate-spin" />
+                      EXITING...
+                    </span>
+                  ) : 'CONFIRM EXIT →'}
+                </button>
+                <button onClick={() => setShowEmergency(false)}
+                  className="px-3 py-2 rounded-lg border border-black/10 font-display text-xs text-black/40 hover:text-black transition-colors">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {redeemError && (

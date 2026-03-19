@@ -1,16 +1,17 @@
 # FLOAT — Yield While You Wait
 
-> **Put your idle stablecoins to work.** Tell FLOAT what you're saving for, and it earns yield in YO Protocol vaults until you need it.
+> Put your idle stablecoins to work. Tell FLOAT what you're saving for, and it earns yield in YO Protocol vaults until you need it back.
 
+**Live demo:** [float-omega.vercel.app](https://float-omega.vercel.app)  
 Built for the [Hack with YO: Designing Smart DeFi Savings](https://dorahacks.io) hackathon.
 
-![FLOAT](https://img.shields.io/badge/chain-Base-blue) ![YO Protocol](https://img.shields.io/badge/protocol-YO-brightgreen) ![ERC-4626](https://img.shields.io/badge/standard-ERC--4626-orange) ![Next.js](https://img.shields.io/badge/Next.js-16-black) ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
+![Base](https://img.shields.io/badge/chain-Base-blue) ![YO Protocol](https://img.shields.io/badge/protocol-YO-brightgreen) ![ERC-4626](https://img.shields.io/badge/standard-ERC--4626-orange) ![Next.js](https://img.shields.io/badge/Next.js-16-black)
 
 ---
 
 ## The Problem
 
-You have $500 in USDC sitting in your wallet for rent due in 25 days. That money is doing **nothing**.
+You have $500 sitting in your wallet for rent due in 25 days. That money is doing nothing.
 
 | Where your money sits | 25-day yield on $500 |
 |---|---|
@@ -18,130 +19,120 @@ You have $500 in USDC sitting in your wallet for rent due in 25 days. That money
 | High-yield savings (4.5% APY) | $1.54 |
 | **FLOAT → YO Protocol** | **$1.10 (a coffee ☕)** |
 
-FLOAT makes this effortless — just describe what you're saving for in plain English, and the AI handles everything.
+FLOAT makes this effortless — describe what you're saving for in plain English, and the AI handles everything.
 
 ---
 
-## How FLOAT Works
+## How It Works
 
 ```
 "$500 for rent in 25 days"
         │
         ▼
-   ┌─────────────┐     ┌──────────────┐     ┌──────────────┐
-   │  AI Classify │────▶│ Approve USDC │────▶│ Deposit into │
-   │  (Claude)    │     │ (ERC-20)     │     │ yoUSD vault  │
-   └─────────────┘     └──────────────┘     └──────┬───────┘
-                                                    │
-                                                    ▼
-                                            ┌──────────────┐
-                                            │ Yield accrues │
-                                            │ via yoTokens  │
-                                            └──────┬───────┘
-                                                    │ Day 24
-                                                    ▼
-                                            ┌──────────────┐
-                                            │ Auto-redeem   │
-                                            │ $500 + yield  │
-                                            └──────────────┘
+   AI Classifies Intent
+   (Claude via OpenRouter)
+        │
+        ▼
+   Approve USDC → Deposit into yoUSD vault
+        │
+        ▼
+   Yield accrues via yoToken exchange rate
+        │  (25 days later)
+        ▼
+   Redeem → $500 + yield, right on time
 ```
-
-1. **Tell it** — Describe your goal: *"$500 for rent in 25 days"*
-2. **AI analyzes** — Claude classifies intent, picks the optimal YO vault, and can split funds across multiple vaults
-3. **Approve + Deposit** — ERC-20 approval → deposit into audited YO Protocol ERC-4626 vaults on Base
-4. **Earn** — Yield accrues automatically via yoTokens (exchange rate increases over time)
-5. **Get it back** — FLOAT triggers redemption 1 day before your deadline. Money + yield, on time.
 
 ---
 
 ## Features
 
-### 🧠 AI-Powered Savings Coach
-- Natural language intent classification via Claude Sonnet 4.5 (OpenRouter)
-- **Multi-vault split recommendations** — AI suggests splitting across vaults based on timeline and risk:
-  - *"Lock your rent in stable yoUSD, and put the rest to work in yoETH for better long-term growth"*
-- Certainty-based liquid buffers (keeps funds in wallet for uncertain expenses)
-- Friendly yield labels: *"a coffee ($1.10)"*, *"a meal ($3.95)"*
+### Unified AI Chat — Float / Zap / Optimizer modes
+One input, three modes toggled at the top:
 
-### 📊 Live Vault Dashboard
-- Real-time APY, TVL, and exchange rates from YO SDK
+- **💸 Float** — Describe a savings goal in plain English. Claude analyzes intent, picks the optimal YO vault, sets the deadline, and can recommend splitting across vaults for better yield.
+- **⚡ Zap** — Deposit any token (ETH, USDC, WETH, cbBTC) into any YO vault in one transaction. AI picks the best route. Powered by our custom **FloatZap** contract which swaps via Uniswap V3 then deposits.
+- **🔮 Optimizer** — Auto-split USDC across all 3 YO vaults for maximum APY. AI explains *why* the allocation makes sense for your timeline. Powered by our custom **FloatOptimizer** contract.
+
+### Live Vault Dashboard
+- Real-time APY, TVL, and exchange rates from YO SDK (`useVaultState`, `useVaults`, `useVaultHistory`)
 - 30-day APY bar chart with hover tooltips
-- All three vaults: yoUSD, yoETH, yoBTC
+- Live yield tickers counting up per-second in real time
 
-### ⚖️ Yield Comparison Engine
-- Interactive comparison: Bank (0.5% APY) vs HYSA (4.5% APY) vs FLOAT (live YO APY)
-- Adjustable amount and timeline inputs
-- Shows multiplier: *"6x more than a bank savings account"*
+### On-Chain Positions + Redeem
+- Reads optimizer positions directly from contract (`getUserPositions`)
+- Two-step redeem: `optimizer.redeem()` sends yoUSD tokens → `yoUSD.redeem()` converts to USDC
+- Emergency exit button on every float card — redeem early anytime, keep yield earned so far
+- Auto-redeem triggers when deadline passes while app is open
 
-### 🛡️ Risk Transparency Panel
-- Per-vault breakdown: underlying asset, supported chains, audit status, total supply
-- Direct links to YO Protocol audit reports and risk documentation
-- Clear risk factor warnings (smart contract risk, redemption timing, variable APY)
+### AI Intelligence Panel
+- **AI Coach** — chat with Claude about your portfolio, ask if you're beating a HYSA, get rebalance advice
+- **Portfolio Report** — full analysis of your positions with specific numbers
+- **Yield Forecast** — 14-day AI prediction curve on top of 30-day historical APY
+- **Rebalancer** — AI suggests vault switches based on current APYs and gas costs
 
-### 🎉 Milestone Notifications
-- Toast alerts for yield milestones: first penny earned, first dollar, halfway point, redemption ready
-- Non-intrusive bottom-right toasts with dismiss
+### Risk & Transparency
+- Per-vault breakdown: underlying asset, chains, audit status, total supply
+- Direct links to YO Protocol audit reports
+- Clear risk factor disclosures
 
-### 🧾 Shareable Savings Receipt
-- Receipt-style modal showing total deposited, yield earned, APY
-- One-click "Share on X" with pre-filled tweet tagging @yo_xyz
+### Yield Comparison
+- Interactive Bank vs HYSA vs FLOAT bars — seeded with your actual USDC balance
+- Shows the multiplier: *"6x more than a bank savings account"*
 
-### 📁 Portfolio Summary
-- Aggregate stats across all active floats: total floating, total earned, next redemption date
-- Active float cards with progress bars, urgency badges, and BaseScan TX links
+### Shareable Savings Receipt
+- Receipt modal showing total deposited, yield earned, APY
+- One-click Share on X tagging @yo_xyz
 
 ---
 
 ## YO SDK Integration
 
-FLOAT uses both `@yo-protocol/core` and `@yo-protocol/react` extensively:
+FLOAT uses `@yo-protocol/react` for all core deposit and redeem flows.
 
-### React Hooks Used
+| Hook | Where used | Purpose |
+|------|-----------|---------|
+| `useDeposit({ vault })` | FloatChat (float mode), FloatCard | Execute deposits via YO Gateway |
+| `useApprove({ token })` | FloatChat (float mode) | ERC-20 approval before deposit |
+| `useRedeem({ vault })` | FloatCard | Redeem yoTokens back to USDC |
+| `useVaultState(vaultId)` | VaultComparisonTable, RiskPanel | Live APY, TVL, exchange rate |
+| `useVaults()` | VaultDashboard | List all available vaults |
+| `useVaultHistory(vaultId)` | VaultDashboard, YieldForecast | 30-day APY + TVL timeseries |
 
-| Hook | Where | Purpose |
-|------|-------|---------|
-| `useVaultState(vaultId)` | Vault Dashboard, Risk Panel | On-chain vault state (totalAssets, exchangeRate, totalSupply) |
-| `useVaults()` | Vault Dashboard | List all available vaults on connected chain |
-| `useVaultHistory(vaultId)` | Vault Dashboard | Historical APY and TVL timeseries for 30-day chart |
-| `useDeposit({ vault })` | IntentInput (per-split) | Execute deposits via YO Gateway with 0.5% slippage protection |
-| `useApprove({ token })` | IntentInput (per-split) | ERC-20 approval for underlying token before deposit |
-| `useYoClient()` | Provider context | Access underlying YoClient instance |
-
-### Core SDK Used (Server-Side)
-
-| Method | Where | Purpose |
-|--------|-------|---------|
-| `createYoClient({ chainId: 8453 })` | API route | Server-side client for Base chain |
-| `getVaultSnapshot(address)` | API route | Off-chain APY, TVL, pool allocations for yield calculation |
-
-### Transaction Flow
-
+### Transaction Flow (Float mode)
 ```
-User types intent
-        │
-        ▼
-POST /api/classify ─── classifyIntent() via OpenRouter (Claude)
-        │                       │
-        │               getVaultAPY() via yoClient.getVaultSnapshot()
-        │                       │
-        │               isWorthFloating() calculates yield vs gas + bank comparison
-        │
-        ▼
-SplitDepositCard component (one per vault split)
-        │
-        ├── useApprove({ token: USDC_ADDRESS })
-        │       └── approve(amount) → ERC-20 approval tx
-        │
-        └── useDeposit({ vault: yoUSD_ADDRESS, slippageBps: 50 })
-                └── deposit({ token, amount }) → YO Gateway deposit tx
-                        │
-                        ▼
-                saveFloat() → localStorage (tracks deadline + auto-redeem schedule)
+User: "500 for rent in 25 days"
+  → POST /api/classify (Claude via OpenRouter)
+  → AI returns: vault=yoUSD, amount=500, days=25, reasoning
+  → useApprove({ token: USDC }) → ERC-20 approval tx
+  → useDeposit({ vault: yoUSD, slippageBps: 50 }) → YO Gateway deposit tx
+  → saveFloat() → localStorage tracks deadline + auto-redeem
 ```
 
-### Key Implementation Detail
+---
 
-Each vault split renders as its own `SplitDepositCard` component. This ensures `useDeposit` and `useApprove` hooks bind to the correct vault/token addresses at mount time — the React-correct way to handle per-item hooks with different params.
+## Custom Smart Contracts (on top of YO vaults)
+
+Both contracts are live on **Base mainnet** and use YO vaults as the yield layer.
+
+### FloatZap — `0x0BE25e03Bec708aCFb2f74C9f99986453702D27C`
+Swap any token into any YO vault in a single transaction. Handles ETH→WETH→yoETH, USDC→yoUSD direct, and USDC→WETH→cbBTC→yoBTC multi-hop routes via Uniswap V3.
+
+```solidity
+function zapIn(address tokenIn, uint256 amountIn, address vault, uint256 minShares)
+    external payable returns (uint256 shares)
+```
+
+### FloatOptimizer — `0xABcD707afA9548AAEa0eA3f909bE08c793C64214`
+Takes USDC, uses FloatZap internally to route into all 3 YO vaults based on live APY rankings and configurable split weights. Tracks positions on-chain with labels and deadlines.
+
+```solidity
+function deposit(uint256 usdcAmount, uint256 matureAt, string calldata label)
+    external returns (uint256 positionId)
+
+function redeem(uint256 positionId) external // sends yoTokens to wallet
+```
+
+Both contracts verified on [BaseScan](https://basescan.org).
 
 ---
 
@@ -150,27 +141,27 @@ Each vault split renders as its own `SplitDepositCard` component. This ensures `
 | Layer | Technology |
 |-------|-----------|
 | Framework | Next.js 16 (App Router) + TypeScript |
-| Blockchain | Base (Chain ID 8453) |
-| Yield Protocol | YO Protocol (`@yo-protocol/core` + `@yo-protocol/react`) |
+| Chain | Base mainnet (Chain ID 8453) |
+| Yield | YO Protocol (`@yo-protocol/core` + `@yo-protocol/react`) |
 | Wallet | RainbowKit + wagmi v2 |
-| AI | Claude Sonnet 4.5 via OpenRouter |
-| Styling | TailwindCSS v4 + Neubrutalism design system |
-| Storage | localStorage (hackathon scope — production: database + cron for auto-redeem) |
+| AI | Claude Sonnet 4.5 via **OpenRouter** |
+| Styling | TailwindCSS + Neubrutalism design system |
+| Contracts | Hardhat + Solidity 0.8.28 |
 
 ---
 
 ## Setup
 
 ```bash
-git clone https://github.com/user/float.git
-cd float
+git clone https://github.com/your-repo/float.git
+cd float/fload-app
 cp .env.example .env.local
 ```
 
-Add your keys to `.env.local`:
+`.env.local`:
 ```
-OPENROUTER_API_KEY=your_openrouter_key
-NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID=your_walletconnect_id
+OPENROUTER_API_KEY=your_key
+NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID=your_key
 ```
 
 ```bash
@@ -178,104 +169,88 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000)
+Open [http://localhost:3000](http://localhost:3000) — connect MetaMask on Base network.
 
 ---
 
 ## Architecture
 
 ```
-float/
+fload-app/
 ├── app/
-│   ├── page.tsx                    # Landing page — neubrutalist hero + connect wallet
-│   ├── dashboard/page.tsx          # Main dashboard — Float / Vaults / Risk tabs
-│   ├── api/classify/route.ts       # AI classification + yield enrichment API
-│   ├── layout.tsx                  # Root layout with Providers
-│   └── globals.css                 # Neubrutalism design tokens + animations
+│   ├── page.tsx                    # Landing page
+│   ├── dashboard/page.tsx          # Main dashboard (AI / Float / Vaults tabs)
+│   └── api/
+│       ├── classify/               # AI intent classifier (float mode)
+│       ├── zap-ai/                 # AI token + vault picker (zap mode)
+│       ├── optimizer-ai/           # AI goal parser + split explainer
+│       ├── coach/                  # AI savings coach chat
+│       ├── forecast/               # AI yield forecast (14-day)
+│       ├── intel/                  # Portfolio intelligence report
+│       └── rebalance/              # AI rebalance recommendations
 │
 ├── components/
-│   ├── IntentInput.tsx             # AI input → multi-split confirmation → deposit
-│   ├── FloatCard.tsx               # Active float card (progress, yield, TX link)
-│   ├── VaultDashboard.tsx          # Live APY chart + vault state (useVaultState)
-│   ├── YieldComparison.tsx         # Bank vs HYSA vs FLOAT interactive bars
+│   ├── FloatChat.tsx               # Unified AI input (Float / Zap / Optimizer modes)
+│   ├── FloatCard.tsx               # Active float with live yield ticker + emergency exit
+│   ├── PaginatedFloats.tsx         # Shows 3 floats, expand for more + on-chain positions
+│   ├── VaultComparisonTable.tsx    # Live APY/TVL/rate table + yield tickers
+│   ├── VaultDashboard.tsx          # 30-day APY bar chart
+│   ├── YieldComparison.tsx         # Bank vs HYSA vs FLOAT (real balance)
 │   ├── RiskPanel.tsx               # Vault transparency + audit links
-│   ├── MilestoneToasts.tsx         # Yield milestone toast notifications
-│   ├── SavingsReceipt.tsx          # Shareable receipt modal + Share on X
-│   ├── PortfolioSummary.tsx        # Aggregate stats across all floats
-│   └── Providers.tsx               # Wagmi + RainbowKit + YieldProvider
+│   ├── AICoach.tsx                 # Chat with Claude about your portfolio
+│   ├── RebalancerPanel.tsx         # AI rebalance with execute button
+│   ├── YieldForecast.tsx           # Chart.js + AI 14-day prediction
+│   ├── PortfolioIntel.tsx          # Full AI portfolio analysis
+│   ├── ZapHistory.tsx              # Paginated ZapIn tx history (on-chain events)
+│   ├── OptimizerHistory.tsx        # Paginated optimizer positions list
+│   ├── AutoRedeemToast.tsx         # Notification when auto-redeem fires
+│   └── MilestoneToasts.tsx         # Yield milestone gamification
+│
+├── hooks/
+│   └── useAutoRedeem.ts            # Polls for matured floats, auto-redeems
 │
 ├── lib/
-│   ├── classify.ts                 # Claude intent classifier (multi-vault splits)
-│   ├── schedule.ts                 # Float storage + milestone detection
+│   ├── contracts.ts                # ABIs + deployed addresses (FloatZap + FloatOptimizer)
+│   ├── classify.ts                 # Claude intent classifier
+│   ├── schedule.ts                 # Float localStorage management
 │   ├── worth-it.ts                 # Yield calculator + bank comparison
-│   ├── yo.ts                       # YO SDK client + vault constants
-│   └── wagmi.ts                    # Wagmi chain config (Base + Ethereum)
+│   └── yo.ts                       # YO SDK vault constants
 │
-└── config files (tailwind, tsconfig, next.config, postcss)
+contracts/
+├── FloatZap.sol                    # Swap any token → any YO vault in 1 tx
+├── FloatOptimizer.sol              # Auto-split USDC across 3 YO vaults
+└── scripts/                        # Deploy + setup scripts
 ```
 
 ---
 
-## Design System
-
-FLOAT uses a **neubrutalism** design language — bold, raw, and intentional:
-
-| Element | Style |
-|---------|-------|
-| Borders | 2.5px solid black on all cards, inputs, buttons |
-| Shadows | Hard offset `4px 4px 0px #1A1A1A` (no blur) |
-| Primary | Acid green `#BFFF0A` |
-| Background | Cream `#FFFDF5` |
-| Typography | Space Mono (display) + DM Sans (body) |
-| Buttons | Chunky, shifts on hover/active with shadow reduction |
-| Tags | Uppercase monospace labels with thick borders |
-
-No gradients. No blur. No rounded-everything. Every element is deliberately bold and legible.
-
----
-
-## Judging Criteria Alignment
+## Judging Criteria
 
 ### UX Simplicity — 30%
-> *Is this the best savings account experience in DeFi?*
-
-Natural language input — just describe your goal in plain English. AI handles vault selection, amount splitting, buffer calculation, and yield projection. Three-step flow: **tell it → confirm → done**. No manual vault research, no parameter tuning, no DeFi jargon.
+Natural language input. Type *"$500 for rent in 25 days"* and the AI handles vault selection, amount, deadline, and yield projection. No DeFi jargon. Three steps: tell it → confirm → done. Emergency exit on every position so users never feel locked in.
 
 ### Creativity & Growth Potential — 30%
-> *Would real users adopt this?*
-
-- AI savings coach that gives personalized multi-vault strategies
-- Yield comparison vs traditional banks (makes the value prop instantly obvious)
-- Shareable savings receipts for social proof and virality
-- Milestone gamification ("Your rent fund just earned its first dollar!")
-- Clear target audience: anyone with idle stablecoins and upcoming expenses
+- AI savings coach with portfolio-specific answers (not generic DeFi advice)
+- ZapIn lets users deposit ETH or BTC without manual swaps — one tx from any token
+- FloatOptimizer automatically maximizes yield by splitting across vaults based on live APYs
+- Yield comparison vs banks makes the value prop instantly obvious
+- Shareable receipts + milestones create organic sharing moments
 
 ### Quality of Integration — 20%
-> *Is the YO SDK properly implemented?*
-
-Full integration across 6 React hooks + 2 core SDK methods. Real approve + deposit flows via YO Gateway on Base with slippage protection. Live on-chain vault data powering the dashboard. Per-split component architecture for correct hook binding.
+6 YO React hooks (`useDeposit`, `useApprove`, `useRedeem`, `useVaultState`, `useVaults`, `useVaultHistory`) live in production. Real approve + deposit flows via YO Gateway with 0.5% slippage. Custom contracts extend YO vaults for multi-token ZapIn and multi-vault optimization while keeping YO as the yield layer.
 
 ### Risk & Trust — 20%
-> *Is it safe and transparent?*
-
-Dedicated Risk tab with per-vault transparency (underlying assets, chains, total supply, audit status). Direct links to audit reports. Clear risk factor warnings. Certainty-based liquid buffers keep funds accessible for uncertain expenses. Fully non-custodial — all funds in YO Protocol's audited ERC-4626 vaults.
+Per-vault transparency panel (underlying, chains, audit status, total supply). Direct audit report links. Explicit risk warnings. Certainty-based liquid buffers for uncertain expenses. Fully non-custodial — all yield generated by YO Protocol's audited ERC-4626 vaults. Emergency exit always available.
 
 ---
 
-## Future Roadmap (Post-Hackathon)
+## Roadmap
 
-- **Auto-redeem via Gelato/Chainlink Automation** — trigger on-chain redemption 1 day before deadline
+- **Auto-redeem via Gelato Web3 Functions** — 24/7 off-session redemption on deadline
 - **Recurring floats** — "Float $800 for rent every month"
-- **Mobile-first PWA** — push notifications for milestones
-- **Multi-chain support** — Ethereum + Arbitrum deposits via YO Gateway
-- **Real yield tracking** — read actual yoToken balance and exchange rate delta
+- **Multi-chain** — Ethereum + Arbitrum via YO Gateway
+- **Mobile PWA** — push notifications for milestones
 
 ---
 
-## License
-
-MIT
-
----
-
-**Built with 🟢 by the FLOAT team for the Hack with YO hackathon**
+*Built with 🟢 for the Hack with YO hackathon · [float-omega.vercel.app](https://float-omega.vercel.app)*

@@ -2,36 +2,21 @@
 
 import { useVaultState } from '@yo-protocol/react'
 import { useState } from 'react'
-
 import type { VaultId } from '@yo-protocol/core'
 
 const VAULT_INFO: Record<string, { underlying: string; chains: string[]; auditStatus: string }> = {
-  yoUSD: {
-    underlying: 'USDC',
-    chains: ['Base', 'Ethereum', 'Arbitrum'],
-    auditStatus: 'Audited',
-  },
-  yoETH: {
-    underlying: 'WETH',
-    chains: ['Base', 'Ethereum'],
-    auditStatus: 'Audited',
-  },
-  yoBTC: {
-    underlying: 'cbBTC',
-    chains: ['Base', 'Ethereum'],
-    auditStatus: 'Audited',
-  },
+  yoUSD: { underlying: 'USDC', chains: ['Base', 'Ethereum', 'Arbitrum'], auditStatus: 'Audited' },
+  yoETH: { underlying: 'WETH', chains: ['Base', 'Ethereum'], auditStatus: 'Audited' },
+  yoBTC: { underlying: 'cbBTC', chains: ['Base', 'Ethereum'], auditStatus: 'Audited' },
 }
 
-export function RiskPanel() {
-  const [expanded, setExpanded] = useState(false)
+export function RiskPanel({ defaultOpen = false }: { defaultOpen?: boolean }) {
+  const [expanded, setExpanded] = useState(defaultOpen)
 
   return (
     <div className="neu-card p-5 flex flex-col gap-3">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="flex items-center justify-between w-full"
-      >
+      <button onClick={() => setExpanded(!expanded)}
+        className="flex items-center justify-between w-full">
         <div className="flex items-center gap-2">
           <div className="neu-tag bg-pink text-black">RISK</div>
           <p className="font-display font-bold text-sm">TRANSPARENCY</p>
@@ -46,12 +31,10 @@ export function RiskPanel() {
             Your funds are deposited into diversified DeFi yield pools managed by the protocol.
           </p>
 
-          {/* Vault breakdown */}
           {(Object.entries(VAULT_INFO) as [VaultId, typeof VAULT_INFO[string]][]).map(([id, info]) => (
             <VaultRiskRow key={id} vaultId={id} info={info} />
           ))}
 
-          {/* Risk warnings */}
           <div className="p-4 bg-pink/10 border-2 border-pink rounded-md">
             <p className="font-display text-xs font-bold uppercase mb-2 text-pink">Risk factors</p>
             <ul className="font-body text-xs text-black/60 space-y-1">
@@ -62,24 +45,11 @@ export function RiskPanel() {
             </ul>
           </div>
 
-          {/* Audit links */}
           <div className="flex gap-2">
-            <a
-              href="https://docs.yo.xyz/protocol/security-audits"
-              target="_blank"
-              rel="noopener"
-              className="neu-btn neu-btn-secondary text-xs flex-1 text-center"
-            >
-              AUDIT REPORTS ↗
-            </a>
-            <a
-              href="https://docs.yo.xyz/protocol/risks"
-              target="_blank"
-              rel="noopener"
-              className="neu-btn neu-btn-secondary text-xs flex-1 text-center"
-            >
-              FULL RISK DOCS ↗
-            </a>
+            <a href="https://docs.yo.xyz/protocol/security-audits" target="_blank" rel="noopener"
+              className="neu-btn neu-btn-secondary text-xs flex-1 text-center">AUDIT REPORTS ↗</a>
+            <a href="https://docs.yo.xyz/protocol/risks" target="_blank" rel="noopener"
+              className="neu-btn neu-btn-secondary text-xs flex-1 text-center">FULL RISK DOCS ↗</a>
           </div>
         </div>
       )}
@@ -89,7 +59,6 @@ export function RiskPanel() {
 
 function VaultRiskRow({ vaultId, info }: { vaultId: VaultId; info: typeof VAULT_INFO[string] }) {
   const { vaultState } = useVaultState(vaultId)
-
   return (
     <div className="p-3 bg-cream border-2 border-black/10 rounded-md">
       <div className="flex items-center justify-between mb-2">

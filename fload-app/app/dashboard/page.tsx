@@ -3,10 +3,12 @@
 import { useAccount } from 'wagmi'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { useEffect, useState, useCallback } from 'react'
-import { IntentInput } from '@/components/IntentInput'
-import { FloatCard } from '@/components/FloatCard'
+
+import { FloatChat } from '@/components/FloatChat'
+
+import { PaginatedFloats } from '@/components/PaginatedFloats'
 import { VaultDashboard } from '@/components/VaultDashboard'
-import { VaultComparisonTable } from '@/components/VaultComparisonTable'
+import { VaultComparisonTable, LiveTickers } from '@/components/VaultComparisonTable'
 import { YieldComparison } from '@/components/YieldComparison'
 import { RiskPanel } from '@/components/RiskPanel'
 import { RebalancerPanel } from '@/components/RebalancerPanel'
@@ -14,25 +16,21 @@ import { GasGatePanel } from '@/components/GasGate'
 import { AICoach } from '@/components/AICoach'
 import { YieldForecast } from '@/components/YieldForecast'
 import { PortfolioIntel } from '@/components/PortfolioIntel'
-import { ZapInput } from '@/components/ZapInput'
-import { OnChainPositions } from '@/components/OnChainPositions'
-import { OptimizerPanel } from '@/components/OptimizerPanel'
+
 import { MilestoneToasts } from '@/components/MilestoneToasts'
-import { ContractsBanner } from '@/components/ContractsBanner'
+import { AutoRedeemToast } from '@/components/AutoRedeemToast'
+import { useAutoRedeem } from '@/hooks/useAutoRedeem'
 import { SavingsReceipt } from '@/components/SavingsReceipt'
-import { getFloats, checkMilestones, type FloatEntry } from '@/lib/schedule'
+import { getFloats, checkMilestones, updateFloatStatus, type FloatEntry } from '@/lib/schedule'
 import { BASESCAN, FLOAT_ZAP_ADDRESS, FLOAT_OPTIMIZER_ADDRESS } from '@/lib/contracts'
 import { differenceInDays } from 'date-fns'
 
-type Tab = 'float' | 'zap' | 'optimizer' | 'vaults' | 'intelligence' | 'risk'
+type Tab = 'float' | 'vaults' | 'intelligence'
 
-const TABS: { id: Tab; label: string; emoji: string }[] = [
-  { id: 'float', label: 'Float', emoji: '💸' },
-  { id: 'zap', label: 'Zap', emoji: '⚡' },
-  { id: 'optimizer', label: 'Optimizer', emoji: '🔮' },
-  { id: 'vaults', label: 'Vaults', emoji: '📊' },
-  { id: 'intelligence', label: 'AI', emoji: '🧠' },
-  { id: 'risk', label: 'Risk', emoji: '🛡' },
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'float', label: 'Float' },
+  { id: 'intelligence', label: 'AI' },
+  { id: 'vaults', label: 'Vaults' },
 ]
 
 export default function Dashboard() {
@@ -41,14 +39,45 @@ export default function Dashboard() {
   const [tab, setTab] = useState<Tab>('float')
   const [intelTab, setIntelTab] = useState<'rebalancer' | 'gas' | 'coach' | 'forecast' | 'intel'>('intel')
   const avgApy = 3.2
+  const [autoRedeemTrigger, setAutoRedeemTrigger] = useState<((label: string) => void) | null>(null)
+  useAutoRedeem(label => {
+    autoRedeemTrigger?.(label)
+    refreshFloats()
+  })
 
   const refreshFloats = useCallback(() => {
-    const active = getFloats().filter(f => f.status === 'active')
+    const seen = new Set<string>()
+    const active = getFloats()
+      .filter(f => f.status === 'active')
+      .filter(f => (f.depositedAmount ?? 0) >= 0.01)  // must have real amount
+      .filter(f => {
+        const key = f.txHash ?? f.id
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
     setFloats(active)
     checkMilestones(active, avgApy)
   }, [avgApy])
 
   useEffect(() => {
+    // Hard purge bad entries directly from localStorage
+    try {
+      const raw = localStorage.getItem('float_entries')
+      if (raw) {
+        const entries = JSON.parse(raw)
+        const seen = new Set<string>()
+        const clean = entries.filter((f: any) => {
+          if ((f.depositedAmount ?? 0) < 0.01) return false
+          if (f.status === 'completed') return false
+          const key = f.txHash ?? f.id
+          if (seen.has(key)) return false
+          seen.add(key)
+          return true
+        })
+        localStorage.setItem('float_entries', JSON.stringify(clean))
+      }
+    } catch { }
     refreshFloats()
     const interval = setInterval(refreshFloats, 15000)
     return () => clearInterval(interval)
@@ -104,7 +133,7 @@ export default function Dashboard() {
                       : 'text-black/50 hover:text-black hover:bg-black/5'
                     }`}
                 >
-                  {t.emoji} {t.label}
+                  {t.label}
                 </button>
               ))}
             </div>
@@ -113,7 +142,6 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <ContractsBanner />
 
       {/* Mobile tab nav */}
       <nav className="md:hidden px-4 pt-3">
@@ -127,7 +155,7 @@ export default function Dashboard() {
                   : 'text-black/40'
                 }`}
             >
-              {t.emoji} {t.label}
+              {t.label}
             </button>
           ))}
         </div>
@@ -161,25 +189,12 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
               {/* Left */}
               <div className="lg:col-span-3 flex flex-col gap-6">
-                <IntentInput onFloatCreated={refreshFloats} />
+                <FloatChat onFloatCreated={refreshFloats} />
+
                 {floats.length > 0 && (
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-                      <p className="font-body text-sm font-medium text-black/40">Active floats</p>
-                      <span className="font-display text-xs text-black/30">{floats.length}</span>
-                    </div>
-                    {floats.map(f => <FloatCard key={f.id} float={f} apy={avgApy} onRedeemed={refreshFloats} />)}
-                  </div>
+                  <PaginatedFloats floats={floats} apy={avgApy} onRedeemed={refreshFloats} />
                 )}
 
-                {/* On-chain optimizer positions with redeem */}
-                <OnChainPositions />
-
-                {/* On-chain optimizer positions */}
-                <OnChainPositions />
-
-                {/* On-chain optimizer positions from FloatOptimizer contract */}
-                <OnChainPositions />
               </div>
 
               {/* Right */}
@@ -216,40 +231,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ─── ZAP TAB ─── */}
-        {tab === 'zap' && (
-          <div className="animate-float-in max-w-xl">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="font-display text-2xl font-bold">Zap In</h2>
-                <p className="font-body text-sm text-black/50 mt-1">
-                  Deposit ETH, USDC, or cbBTC — auto-swapped via Uniswap V3 in one tx
-                </p>
-              </div>
-              <span className="neu-tag bg-blue text-black">FloatZap contract</span>
-            </div>
-            <ZapInput onFloatCreated={refreshFloats} />
-          </div>
-        )}
 
-        {/* ─── OPTIMIZER TAB ─── */}
-        {tab === 'optimizer' && (
-          <div className="animate-float-in max-w-xl">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="font-display text-2xl font-bold">Yield Optimizer</h2>
-                <p className="font-body text-sm text-black/50 mt-1">
-                  Auto-splits USDC across all 3 YO vaults for maximum APY
-                </p>
-              </div>
-              <span className="neu-tag" style={{ background: '#8B5CF622', color: '#8B5CF6', borderColor: '#8B5CF6' }}>FloatOptimizer contract</span>
-            </div>
-            <OptimizerPanel onFloatCreated={refreshFloats} />
-            <div className="mt-4">
-              <OnChainPositions />
-            </div>
-          </div>
-        )}
 
         {/* ─── VAULTS TAB ─── */}
         {tab === 'vaults' && (
@@ -258,7 +240,8 @@ export default function Dashboard() {
               <h2 className="font-display text-2xl font-bold">Vault dashboard</h2>
               <span className="neu-tag bg-acid">Live on-chain data</span>
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Top row — comparison table + APY chart */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
               <div>
                 <p className="font-display text-xs font-bold uppercase text-black/40 tracking-wider mb-3">
                   Live comparison
@@ -271,6 +254,11 @@ export default function Dashboard() {
                 </p>
                 <VaultDashboard />
               </div>
+            </div>
+            {/* Bottom row — live tickers + risk side by side */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <LiveTickers />
+              <RiskPanel defaultOpen />
             </div>
           </div>
         )}
@@ -314,15 +302,6 @@ export default function Dashboard() {
             </div>
           </div>
         )}
-
-        {/* ─── RISK TAB ─── */}
-        {tab === 'risk' && (
-          <div className="max-w-3xl animate-float-in">
-            <h2 className="font-display text-2xl font-bold mb-6">Risk & transparency</h2>
-            <RiskPanel />
-          </div>
-        )}
-
         <footer className="text-center py-8 mt-12 border-t border-black/5">
           <p className="font-body text-xs text-black/25">
             FLOAT • Built on{' '}
@@ -334,6 +313,7 @@ export default function Dashboard() {
         </footer>
       </main>
 
+      <AutoRedeemToast onMount={fn => setAutoRedeemTrigger(() => fn)} />
       <MilestoneToasts />
     </div>
   )

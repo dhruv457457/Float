@@ -162,19 +162,36 @@ export function VaultComparisonTable() {
                 {VAULT_IDS.map(id => <VaultRow key={id} vaultId={id} floats={floats} />)}
             </div>
 
-            {floats.length > 0 && (
-                <div className="neu-card p-5">
-                    <div className="flex items-center gap-2 mb-3">
-                        <span className="neu-tag bg-white">Live tickers</span>
-                        <span className="font-body text-xs text-black/50">Yield counting up in real time</span>
-                    </div>
-                    <div className="flex flex-col gap-3">
-                        {floats.map(f => (
-                            <FloatTicker key={f.id} float={f} apy={FALLBACK_APY[f.vault as VaultId] ?? 3.18} />
-                        ))}
-                    </div>
-                </div>
-            )}
+        </div>
+    )
+}
+
+// ── Exported live tickers for use in other layouts ─────────────────
+export function LiveTickers() {
+    const [floats, setFloats] = useState<FloatEntry[]>([])
+    useEffect(() => { setFloats(getActiveFloats()) }, [])
+
+    if (floats.length === 0) return (
+        <div className="neu-card p-5 flex flex-col gap-2">
+            <div className="flex items-center gap-2 mb-1">
+                <span className="neu-tag bg-white">Live tickers</span>
+                <span className="font-body text-xs text-black/50">Yield counting up in real time</span>
+            </div>
+            <p className="font-body text-sm text-black/30 text-center py-4">No active floats yet</p>
+        </div>
+    )
+
+    return (
+        <div className="neu-card p-5">
+            <div className="flex items-center gap-2 mb-3">
+                <span className="neu-tag bg-white">Live tickers</span>
+                <span className="font-body text-xs text-black/50">Yield counting up in real time</span>
+            </div>
+            <div className="flex flex-col gap-3">
+                {floats.map(f => (
+                    <FloatTicker key={f.id} float={f} apy={FALLBACK_APY[f.vault as VaultId] ?? 3.18} />
+                ))}
+            </div>
         </div>
     )
 }

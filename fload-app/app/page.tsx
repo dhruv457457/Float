@@ -103,7 +103,7 @@ export default function Home() {
             <div className="w-full border-t-neu border-black bg-black overflow-hidden">
                 <div className="marquee-track py-2">
                     {Array.from({ length: 4 }).map((_, i) => (
-                        <span key={i} className="font-display text-sm font-bold tracking-wider whitespace-nowrap px-8 text-acid">
+                        <span key={i} className="font-display text-sm font-bold tracking-wider whitespace-nowrap px-8 text-white">
                             yoUSD &bull; yoETH &bull; yoBTC &bull; SMART SAVINGS &bull; AI-POWERED &bull; ZERO FEES &bull; AUTO-REDEEM &bull;&nbsp;
                         </span>
                     ))}
