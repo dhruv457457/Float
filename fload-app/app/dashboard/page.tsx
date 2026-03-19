@@ -14,17 +14,24 @@ import { GasGatePanel } from '@/components/GasGate'
 import { AICoach } from '@/components/AICoach'
 import { YieldForecast } from '@/components/YieldForecast'
 import { PortfolioIntel } from '@/components/PortfolioIntel'
+import { ZapInput } from '@/components/ZapInput'
+import { OnChainPositions } from '@/components/OnChainPositions'
+import { OptimizerPanel } from '@/components/OptimizerPanel'
 import { MilestoneToasts } from '@/components/MilestoneToasts'
+import { ContractsBanner } from '@/components/ContractsBanner'
 import { SavingsReceipt } from '@/components/SavingsReceipt'
 import { getFloats, checkMilestones, type FloatEntry } from '@/lib/schedule'
+import { BASESCAN, FLOAT_ZAP_ADDRESS, FLOAT_OPTIMIZER_ADDRESS } from '@/lib/contracts'
 import { differenceInDays } from 'date-fns'
 
-type Tab = 'float' | 'vaults' | 'intelligence' | 'risk'
+type Tab = 'float' | 'zap' | 'optimizer' | 'vaults' | 'intelligence' | 'risk'
 
 const TABS: { id: Tab; label: string; emoji: string }[] = [
   { id: 'float', label: 'Float', emoji: '💸' },
-  { id: 'vaults', label: 'Vaults', emoji: '⚡' },
-  { id: 'intelligence', label: 'Intelligence', emoji: '🧠' },
+  { id: 'zap', label: 'Zap', emoji: '⚡' },
+  { id: 'optimizer', label: 'Optimizer', emoji: '🔮' },
+  { id: 'vaults', label: 'Vaults', emoji: '📊' },
+  { id: 'intelligence', label: 'AI', emoji: '🧠' },
   { id: 'risk', label: 'Risk', emoji: '🛡' },
 ]
 
@@ -106,6 +113,8 @@ export default function Dashboard() {
         </div>
       </header>
 
+      <ContractsBanner />
+
       {/* Mobile tab nav */}
       <nav className="md:hidden px-4 pt-3">
         <div className="flex gap-1 bg-black/5 p-1 rounded-lg">
@@ -162,6 +171,15 @@ export default function Dashboard() {
                     {floats.map(f => <FloatCard key={f.id} float={f} apy={avgApy} onRedeemed={refreshFloats} />)}
                   </div>
                 )}
+
+                {/* On-chain optimizer positions with redeem */}
+                <OnChainPositions />
+
+                {/* On-chain optimizer positions */}
+                <OnChainPositions />
+
+                {/* On-chain optimizer positions from FloatOptimizer contract */}
+                <OnChainPositions />
               </div>
 
               {/* Right */}
@@ -194,6 +212,41 @@ export default function Dashboard() {
                   <SavingsReceipt avgApy={avgApy} />
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── ZAP TAB ─── */}
+        {tab === 'zap' && (
+          <div className="animate-float-in max-w-xl">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="font-display text-2xl font-bold">Zap In</h2>
+                <p className="font-body text-sm text-black/50 mt-1">
+                  Deposit ETH, USDC, or cbBTC — auto-swapped via Uniswap V3 in one tx
+                </p>
+              </div>
+              <span className="neu-tag bg-blue text-black">FloatZap contract</span>
+            </div>
+            <ZapInput onFloatCreated={refreshFloats} />
+          </div>
+        )}
+
+        {/* ─── OPTIMIZER TAB ─── */}
+        {tab === 'optimizer' && (
+          <div className="animate-float-in max-w-xl">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="font-display text-2xl font-bold">Yield Optimizer</h2>
+                <p className="font-body text-sm text-black/50 mt-1">
+                  Auto-splits USDC across all 3 YO vaults for maximum APY
+                </p>
+              </div>
+              <span className="neu-tag" style={{ background: '#8B5CF622', color: '#8B5CF6', borderColor: '#8B5CF6' }}>FloatOptimizer contract</span>
+            </div>
+            <OptimizerPanel onFloatCreated={refreshFloats} />
+            <div className="mt-4">
+              <OnChainPositions />
             </div>
           </div>
         )}

@@ -1,6 +1,12 @@
 'use client'
 
 import { useState } from 'react'
+import { useWriteContract } from 'wagmi'
+import {
+  FLOAT_OPTIMIZER_ADDRESS,
+  FLOAT_OPTIMIZER_ABI,
+  YO_VAULTS,
+} from '@/lib/contracts'
 import { useRedeem, useDeposit, useApprove } from '@yo-protocol/react'
 import { parseUnits } from 'viem'
 import { getActiveFloats, updateFloatStatus } from '@/lib/schedule'
@@ -157,23 +163,39 @@ function RebalanceCard({
     slippageBps: 50,
   })
 
+  const { writeContractAsync } = useWriteContract()
+
+  // Find on-chain positionId for this float (stored in txHash for optimizer floats)
+  // For YO SDK floats, fall back to local redeem/deposit flow
+  const isOptimizerFloat = float && (float as any).positionId != null
+
   async function executeRebalance() {
     if (!float || !targetVault) return
     setStatus('executing')
     try {
-      // 1. Redeem from current vault
-      await redeem(BigInt(float.shares || '1'))
-
-      // 2. Approve + deposit into target vault
-      const amount = parseUnits(float.depositedAmount.toString(), VAULT_DECIMALS[targetVault])
-      await approve(amount)
-      await deposit({
-        token: UNDERLYING_ADDRESSES[targetVault] as `0x${string}`,
-        amount,
-      })
-
-      // 3. Update local state
-      updateFloatStatus(float.id, { vault: targetVault })
+      if (isOptimizerFloat) {
+        // On-chain rebalance via FloatOptimizer contract
+        const posId = BigInt((float as any).positionId)
+        const fromAddr = VAULT_ADDRESSES[rec.currentVault as keyof typeof VAULT_ADDRESSES] as `0x${string}`
+        const toAddr = VAULT_ADDRESSES[targetVault] as `0x${string}`
+        // shares to move: use full yoUSD shares (simplified — moves 100% of that vault's shares)
+        await writeContractAsync({
+          address: FLOAT_OPTIMIZER_ADDRESS,
+          abi: FLOAT_OPTIMIZER_ABI,
+          functionName: 'rebalance',
+          args: [posId, fromAddr, toAddr, BigInt(float.shares || '0')],
+        })
+      } else {
+        // YO SDK direct float — redeem + redeposit via hooks
+        await redeem(BigInt(float.shares || '1'))
+        const amount = parseUnits(float.depositedAmount.toString(), VAULT_DECIMALS[targetVault])
+        await approve(amount)
+        await deposit({
+          token: UNDERLYING_ADDRESSES[targetVault] as `0x${string}`,
+          amount,
+        })
+        updateFloatStatus(float.id, { vault: targetVault })
+      }
       setStatus('done')
     } catch (e: any) {
       setStatus('error')
@@ -221,7 +243,7 @@ function RebalanceCard({
 
       {isRebalance && status === 'idle' && (
         <button onClick={executeRebalance} className="neu-btn neu-btn-primary w-full text-xs">
-          EXECUTE REBALANCE →
+          EXECUTE ON-CHAIN REBALANCE →
         </button>
       )}
       {status === 'executing' && (
