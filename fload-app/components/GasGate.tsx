@@ -81,7 +81,7 @@ export function GasGatePanel() {
     <div className="flex flex-col gap-4">
       <div className="neu-card p-5">
         <div className="flex items-center gap-2 mb-4">
-          <span className="neu-tag bg-orange text-white">Gas gate</span>
+          <span className="neu-tag bg-orange text-black">Gas gate</span>
           <span className="font-body text-xs text-black/50">
             Prevents gas from eating your yield
           </span>

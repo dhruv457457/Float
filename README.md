@@ -60,87 +60,153 @@ The same AI input drives three different strategies:
 | **Zap** | *"0.01 ETH idle for 45 days"* | Routes ETH→WETH→yoETH via FloatZap in one tx |
 | **Optimizer** | *"Maximize yield on $300 for 60 days"* | Splits USDC across yoETH/yoUSD/yoBTC via FloatOptimizer |
 
-### AI Coach — Always Available
+---
 
-Beyond deposits, FLOAT's Claude-powered coach answers real questions about your portfolio:
+## ⚡ FloatZap — Any Token, Any Vault, One Transaction
 
-> *"Am I beating a HYSA right now?"*
-> → *"At $1 your gas cost (8¢) outweighs the yield advantage vs a 4.5% HYSA. At $500+ FLOAT generates $1.10 vs HYSA's $1.54 over 25 days — competitive and non-custodial."*
+Most DeFi yield apps only accept the vault's native token. If you have ETH and want to deposit into yoUSD, you'd normally need to: swap ETH → USDC on Uniswap, approve USDC, then deposit into the vault. Three separate transactions.
 
-> *"Should I rebalance my ETH float?"*
-> → Claude checks current APYs, calculates if gas payback period makes sense, and recommends keep or move with exact numbers.
+**FloatZap collapses that into one.**
+
+```
+ETH  ──────────────────────────────▶  yoETH  (WETH via Uniswap V3)
+USDC ──────────────────────────────▶  yoUSD  (direct deposit)
+USDC ──▶ WETH ──▶ cbBTC ────────────▶  yoBTC  (multi-hop via Uniswap V3)
+```
+
+Deployed at [`0x0BE25e03Bec708aCFb2f74C9f99986453702D27C`](https://basescan.org/address/0x0BE25e03Bec708aCFb2f74C9f99986453702D27C) on Base mainnet.
+
+You just type *"I have 0.01 ETH idle for 45 days"* — the AI picks the best vault and route, one MetaMask popup, done.
 
 ---
 
-## Under the Hood
+## 🔮 FloatOptimizer — AI-Directed Multi-Vault Splitting
 
-### YO Protocol — The Yield Layer
+Single-vault deposits leave yield on the table. The Optimizer does better:
 
-FLOAT deposits all funds into YO Protocol's audited ERC-4626 vaults on Base:
+1. Reads live APYs from all 3 YO vaults on-chain
+2. Sorts by yield and your timeline (short timelines favour stability, long timelines favour yoETH)
+3. Uses FloatZap internally to route USDC into each vault
+4. Tracks your position on-chain with label + deadline
 
-- **yoUSD** — 3.18% APY, USDC, stable
-- **yoETH** — 5.42% APY, WETH, medium risk
-- **yoBTC** — 1.92% APY, cbBTC, low-medium risk
+```
+$300 for 60 days
+  ├── $180 (60%) → yoETH via FloatZap swap   [5.42% APY — highest yield]
+  ├── $90  (30%) → yoUSD direct deposit       [3.18% APY — stability]
+  └── $30  (10%) → yoBTC via FloatZap swap    [1.92% APY — diversification]
 
-YO vaults handle all the complex yield generation. FLOAT handles the UX.
+Weighted avg APY: 4.47% vs 3.18% single vault
+Extra yield over 60 days: +$0.44
+```
 
-### YO SDK Integration
+The AI explains every allocation decision before you confirm. You see exactly where your money goes and why.
 
-| Hook | Purpose |
-|------|---------|
-| `useDeposit({ vault })` | Execute deposits via YO Gateway |
-| `useApprove({ token })` | ERC-20 approval before deposit |
-| `useRedeem({ vault })` | Redeem yoTokens → USDC |
-| `useVaultState(vaultId)` | Live APY, TVL, exchange rate |
-| `useVaults()` | All available vaults |
-| `useVaultHistory(vaultId)` | 30-day APY timeseries for charts + AI forecasts |
+Deployed at [`0xABcD707afA9548AAEa0eA3f909bE08c793C64214`](https://basescan.org/address/0xABcD707afA9548AAEa0eA3f909bE08c793C64214) on Base mainnet.
 
-### Two Custom Contracts — Extending YO
+Both contracts are **live, tested, and non-custodial** — funds flow directly into YO Protocol's audited ERC-4626 vaults.
 
-We built two contracts on top of YO vaults to make the AI strategies possible:
+---
 
-**FloatZap** [`0x0BE25e03Bec708aCFb2f74C9f99986453702D27C`](https://basescan.org/address/0x0BE25e03Bec708aCFb2f74C9f99986453702D27C)
-Swap any token into any YO vault in one transaction. ETH → WETH → yoETH. USDC → cbBTC → yoBTC. Uniswap V3 routing under the hood. The AI Zap mode uses this.
+## Full Feature Set
 
-**FloatOptimizer** [`0xABcD707afA9548AAEa0eA3f909bE08c793C64214`](https://basescan.org/address/0xABcD707afA9548AAEa0eA3f909bE08c793C64214)
-Takes USDC, reads live APYs, uses FloatZap to route into all 3 vaults weighted by yield and timeline. Tracks positions on-chain with labels and deadlines. The AI Optimizer mode uses this.
+### 🧠 AI Savings Coach (always available)
+Chat with Claude about your live portfolio. It has real context — your positions, current APYs, gas costs — and gives specific answers:
 
-Both are live on Base mainnet. Both are non-custodial — funds flow directly into YO vaults.
+> *"Am I beating a HYSA?"* → Claude compares your actual yield vs 4.5% HYSA with real numbers  
+> *"Should I rebalance my ETH float?"* → Claude calculates gas payback period and recommends keep or move  
+> *"Which vault is best for 45 days?"* → Claude factors in swap costs and timeline to give a concrete answer
 
-### AI Infrastructure
+### 🔄 AI Rebalancer
+Analyzes all your positions and tells you exactly which ones to move and why. Shows the yield gain, gas cost, and days to break even. Execute button fires the on-chain rebalance directly.
 
-All AI runs through **OpenRouter → Claude Sonnet 4.5**:
+### 📈 AI Yield Forecast
+Generates a 14-day APY prediction curve on top of 30-day historical data for each vault. Claude reads the trend and gives a written analysis: *"yoUSD has shown stable yields around 3.18% with low volatility. Near-term yield expected to remain in 3.0–3.4% range..."*
 
-- `/api/classify` — intent parsing, vault selection, yield projection, bank comparison
-- `/api/zap-ai` — token + vault recommendation from natural language
-- `/api/optimizer-ai` — goal parsing + split allocation explanation
-- `/api/coach` — conversational portfolio advisor with live context
-- `/api/forecast` — 14-day APY prediction from historical data
-- `/api/intel` — full portfolio analysis report
-- `/api/rebalance` — rebalance suggestions with gas payback calculation
+### 🔬 Portfolio Intelligence Report
+One-click full analysis of your portfolio. Mentions your actual floats by name, compares your yield to HYSA, and gives a concrete suggestion — e.g. *"For amounts under $50, gas cost makes FLOAT less efficient than HYSA. At $500+, FLOAT generates meaningful yield."*
 
-Every API call passes live vault APYs and the user's actual USDC balance to Claude — so the AI never suggests floating money you don't have, and every recommendation reflects real on-chain conditions.
+### 📊 Live Vault Dashboard
+- Real-time APY, TVL, and exchange rates from YO SDK (`useVaultState`, `useVaults`, `useVaultHistory`)
+- 30-day APY bar chart with hover tooltips
+- **Live yield tickers** — yield counting up per-second in real time on every active float
+
+### ⚖️ Yield Comparison
+Interactive bank vs HYSA vs FLOAT bars seeded with your **actual USDC balance** (not a hardcoded number). Adjustable amount and days. Shows the multiplier: *"6x more than a bank savings account."*
+
+### 🧾 Shareable Savings Receipt
+Receipt-style modal showing total deposited, yield earned, and APY. One-click **Share on X** with pre-filled tweet tagging @yo_xyz. Generates organic sharing moments when users see their earnings.
+
+### 🎉 Milestone Toasts
+Gamification layer — toast notifications fire when your floats hit yield milestones: first penny earned, first dollar, halfway to deadline, ready to redeem. Non-intrusive, dismiss on click.
+
+### 🛡️ Risk & Transparency
+Always-visible panel on the Vaults tab showing per-vault breakdown: underlying asset, supported chains, audit status, total supply from YO SDK. Direct links to YO Protocol audit reports and risk docs.
 
 ---
 
 ## Safety First
 
-FLOAT is built on the assumption that users trust it with real money.
+FLOAT is built on the assumption that users trust it with real money:
 
-- **Emergency exit** on every position — redeem early anytime, keep yield earned so far
-- **Auto-redeem** — app detects matured floats and redeems automatically while open (Gelato Web3 Functions for 24/7 automation post-hackathon)
-- **Gas gate** — AI warns before suggesting a deposit where gas costs outweigh yield
+- **Emergency exit** on every card — redeem early anytime, keep yield earned so far
+- **Auto-redeem** — detects matured floats and redeems automatically while app is open (Gelato Web3 Functions for 24/7 off-session automation post-hackathon)
+- **Gas gate** — AI warns before suggesting a deposit where gas costs outweigh projected yield
 - **Liquid buffers** — for uncertain expenses, AI keeps a portion in your wallet
-- **Risk transparency** — every vault shows audit status, underlying asset, chains, and risk factors
 - **Non-custodial** — your keys, your funds. FLOAT never holds anything.
+
+---
+
+## YO SDK Integration
+
+| Hook | Where used | Purpose |
+|------|-----------|---------|
+| `useDeposit({ vault })` | FloatChat (float mode) | Execute deposits via YO Gateway |
+| `useApprove({ token })` | FloatChat (float mode) | ERC-20 approval before deposit |
+| `useRedeem({ vault })` | FloatCard | Redeem yoTokens → USDC |
+| `useVaultState(vaultId)` | VaultComparisonTable, RiskPanel | Live APY, TVL, exchange rate |
+| `useVaults()` | VaultDashboard | List all available vaults |
+| `useVaultHistory(vaultId)` | VaultDashboard, YieldForecast | 30-day APY + TVL timeseries |
+
+---
+
+## AI Infrastructure
+
+All AI runs through **OpenRouter → Claude Sonnet 4.5**:
+
+| API Route | Purpose |
+|-----------|---------|
+| `/api/classify` | Intent parsing, vault selection, yield projection, bank comparison |
+| `/api/zap-ai` | Token + vault recommendation from natural language |
+| `/api/optimizer-ai` | Goal parsing + split allocation explanation |
+| `/api/coach` | Conversational portfolio advisor with live vault context |
+| `/api/forecast` | 14-day APY prediction from 30-day historical data |
+| `/api/intel` | Full portfolio analysis report |
+| `/api/rebalance` | Rebalance suggestions with gas payback calculation |
+
+Every call passes live vault APYs and the user's actual USDC balance — AI never suggests floating money you don't have.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | Next.js 16 (App Router) + TypeScript |
+| Chain | Base mainnet (Chain ID 8453) |
+| Yield | YO Protocol (`@yo-protocol/core` + `@yo-protocol/react`) |
+| Wallet | RainbowKit + wagmi v2 |
+| AI | Claude Sonnet 4.5 via **OpenRouter** |
+| Styling | TailwindCSS + Neubrutalism design system |
+| Contracts | Hardhat + Solidity 0.8.28 |
 
 ---
 
 ## Setup
 
 ```bash
-git clone https://github.com/your-repo/float
-cd float/fload-app
+git clone https://github.com/dhruv457457/Float
+cd Float/fload-app
+cp .env.example .env.local
 ```
 
 `.env.local`:
@@ -161,9 +227,8 @@ Connect MetaMask on Base mainnet → start floating.
 
 - **Gelato automation** — 24/7 auto-redeem without needing the app open
 - **Recurring floats** — *"Float my rent every month automatically"*
-- **Voice input** — describe goals by speaking
 - **Multi-chain** — Ethereum + Arbitrum via YO Gateway
-- **Mobile PWA** — push notifications when yield milestones hit
+- **Mobile PWA** — push notifications for milestones and redemptions
 
 ---
 

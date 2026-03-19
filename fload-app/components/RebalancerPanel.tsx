@@ -9,7 +9,7 @@ import {
 } from '@/lib/contracts'
 import { useRedeem, useDeposit, useApprove } from '@yo-protocol/react'
 import { parseUnits } from 'viem'
-import { getActiveFloats, updateFloatStatus } from '@/lib/schedule'
+import { getActiveFloats, getFloats, updateFloatStatus } from '@/lib/schedule'
 import { VAULT_ADDRESSES, UNDERLYING_ADDRESSES, VAULT_DECIMALS } from '@/lib/yo'
 
 type VaultKey = 'yoUSD' | 'yoETH' | 'yoBTC'
@@ -41,19 +41,26 @@ export function RebalancerPanel() {
   async function analyze() {
     setLoading(true)
     setError('')
-    const floats = getActiveFloats()
+    setRecs([])
+
+    // Only use floats with real amounts
+    const floats = getActiveFloats().filter(f => (f.depositedAmount ?? 0) >= 0.01)
+
     if (!floats.length) {
-      setError('No active floats to analyze.')
+      // Try all floats including $0 amount ones as fallback
+      const allFloats = getActiveFloats()
+      console.log('All active floats:', allFloats)
+      setError(`No floats with amount ≥ $0.01 found. You have ${allFloats.length} localStorage entries. If you deposited via Optimizer, those are on-chain — add a manual entry or use the Float mode to create a tracked position.`)
       setLoading(false)
       return
     }
 
     const floatData = floats.map(f => ({
-      label: f.label,
-      vault: f.vault,
+      label: f.label || 'Float',
+      vault: f.vault || 'yoUSD',
       amount: f.depositedAmount,
-      daysElapsed: Math.floor((Date.now() - new Date(f.depositedAt).getTime()) / 86400000),
-      daysTotal: Math.floor((new Date(f.neededAt).getTime() - new Date(f.depositedAt).getTime()) / 86400000),
+      daysElapsed: Math.max(0, Math.floor((Date.now() - new Date(f.depositedAt).getTime()) / 86400000)),
+      daysTotal: Math.max(1, Math.floor((new Date(f.neededAt).getTime() - new Date(f.depositedAt).getTime()) / 86400000)),
     }))
 
     try {
@@ -62,10 +69,25 @@ export function RebalancerPanel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ floats: floatData, vaultApys: VAULT_APYS }),
       })
+
+      if (!res.ok) {
+        const txt = await res.text()
+        setError(`API error ${res.status}: ${txt.slice(0, 100)}`)
+        setLoading(false)
+        return
+      }
+
       const data = await res.json()
-      setRecs(data.recommendations ?? [])
+      if (data.error) {
+        setError(data.error)
+      } else {
+        setRecs(data.recommendations ?? [])
+        if (!data.recommendations?.length) {
+          setError('No recommendations returned. Try again.')
+        }
+      }
     } catch (e: any) {
-      setError(e.message || 'Analysis failed')
+      setError(e.message || 'Network error — check console')
     }
     setLoading(false)
   }
@@ -206,11 +228,10 @@ function RebalanceCard({
   const isRebalance = rec.action === 'rebalance'
 
   return (
-    <div className={`border rounded-xl p-4 bg-white transition-all ${
-      isRebalance
+    <div className={`border rounded-xl p-4 bg-white transition-all ${isRebalance
         ? 'border-acid-dark border-2 bg-acid/5'
         : 'border-black/10'
-    }`}>
+      }`}>
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-display text-sm font-bold">{rec.floatLabel}</span>

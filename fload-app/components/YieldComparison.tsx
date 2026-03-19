@@ -18,17 +18,21 @@ export function YieldComparison({ floatApy }: Props) {
     address, token: TOKENS.USDC.address,
     query: { enabled: !!address },
   })
+  const { data: ethBalance } = useBalance({
+    address, query: { enabled: !!address },
+  })
 
   const [amount, setAmount] = useState(1000)
   const [days, setDays] = useState(30)
 
-  // Seed with real USDC balance when it loads
+  // Seed with total wallet value (USDC + ETH in USD approx)
   useEffect(() => {
-    if (usdcBalance) {
-      const bal = parseFloat(formatUnits(usdcBalance.value, 6))
-      if (bal > 0) setAmount(Math.round(bal))
-    }
+    const usdc = usdcBalance ? parseFloat(formatUnits(usdcBalance.value, 6)) : 0
+    if (usdc > 0) setAmount(Math.round(usdc))
   }, [usdcBalance])
+
+  const usdcNum = usdcBalance ? parseFloat(formatUnits(usdcBalance.value, 6)) : 0
+  const ethNum  = ethBalance  ? parseFloat(formatUnits(ethBalance.value, 18)) : 0
 
   const bankYield  = (BANK_APY  / 100 / 365) * amount * days
   const hysaYield  = (HYSA_APY  / 100 / 365) * amount * days
@@ -48,11 +52,14 @@ export function YieldComparison({ floatApy }: Props) {
           <input type="number" value={amount}
             onChange={e => setAmount(Number(e.target.value) || 0)}
             className="neu-input w-full text-sm mt-1" />
-          {usdcBalance && (
-            <p className="font-body text-xs text-black/30 mt-0.5">
-              Balance: ${parseFloat(formatUnits(usdcBalance.value, 6)).toFixed(2)}
-            </p>
-          )}
+          <div className="flex gap-2 flex-wrap mt-0.5">
+            {usdcNum > 0 && (
+              <p className="font-body text-xs text-black/30">USDC ${usdcNum.toFixed(2)}</p>
+            )}
+            {ethNum > 0.0001 && (
+              <p className="font-body text-xs text-black/30">ETH {ethNum.toFixed(4)}</p>
+            )}
+          </div>
         </div>
         <div>
           <label className="font-display text-[10px] text-black/40 uppercase">Days</label>
