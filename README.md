@@ -221,9 +221,6 @@ npm install && npm run dev
 
 Connect MetaMask on Base mainnet → start floating.
 
----
-
-## Roadmap
 
 - **Gelato automation** — 24/7 auto-redeem without needing the app open
 - **Recurring floats** — *"Float my rent every month automatically"*
